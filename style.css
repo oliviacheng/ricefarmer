@@ -1,0 +1,52 @@
+body {
+    font-family: 'Poppins', sans-serif;
+}
+
+#startScreen {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.7);
+    color: white;
+    font-size: 40px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    z-index: 100;
+}
+
+#textInputBox {
+    display: none; /* Initially hide the text input box */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 20px;
+    background-color: white;
+    border: 1px solid #ccc;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+#textInputBox input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    font-size: 30px;
+    border: 1px solid #ccc;
+    margin-bottom: 10px;
+}
+#textInputBox button {
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.submittedText {
+    position: absolute;
+    top: 10%;
+    right: 10%;
+    font-size: 40px;
+    color: black;
+    z-index: 100;
+}

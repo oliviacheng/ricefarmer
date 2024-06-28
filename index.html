@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="style.css">
+    <meta charset="utf-8">
+    <title>My first three.js app</title>
+    <style>
+        body { margin: 0; }
+    </style>
+    <script type="importmap">
+        {
+          "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+          }
+        }
+    </script>
+</head>
+<body>
+
+  <!-- Start Screen -->
+  <div id="startScreen">Click to start healing</div>
+
+    <!--inputbox-->
+    <div id="textInputBox">
+        <input type="text" id="textInput" placeholder="Something I need to let go of...">
+        <button onclick="submitText()">Submit</button>
+    </div>
+
+    <!--cdn-->
+    <script type="module" src="/main.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/controls/PointerLockControls.js"></script>
+</body>
+</html>
