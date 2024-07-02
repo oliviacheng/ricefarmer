@@ -1,17 +1,20 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js';
-import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/controls/PointerLockControls.js';
+import { Sky } from 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/objects/Sky.js';
+import { createTerrain, getTerrainHeightAt } from './terrain.js';
 
-let scene, camera, renderer, sphere, controls;
+let scene, camera, renderer, sphere;
 let moveForward = false;
 let moveBackward = false;
 let moveLeft = false;
 let moveRight = false;
+const rotationSpeed = 0.02;
+const movementSpeed = 0.08;
 let velocity = new THREE.Vector3();
 let direction = new THREE.Vector3();
-const speed = 5.0;
 const objects = [];
 let isColliding = false;
 let collidingObject = null;
+const terrainHalfSize = 100; // Half of the terrain size
 
 init();
 animate();
@@ -19,33 +22,32 @@ animate();
 function init() {
     console.log('Initializing scene');
 
-    // Set up start screen click event
-    const startScreen = document.getElementById('startScreen');
-    startScreen.addEventListener('click', startGame);
+    // Set up document click event to start game
+    document.addEventListener('click', startGame);
 
     // Scene
     scene = new THREE.Scene();
+    console.log('Scene initialized:', scene);
 
     // Camera
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 1.8, 5);
+    camera.position.set(0, 2, 5);
     scene.add(camera);
 
     // Renderer
     renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(0xffffff); // Set background color to white
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.5;
     document.body.appendChild(renderer.domElement);
 
-    // Terrain
-    const terrainGeometry = new THREE.PlaneGeometry(25, 25, 25, 25);
-    const terrainMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
-    const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
-    terrain.rotation.x = -Math.PI / 2;
-    scene.add(terrain);
+    // Initialize and create terrain
+    console.log('Creating terrain');
+    createTerrain(scene);
 
-    // Sphere (Camera)
-    const sphereGeometry = new THREE.SphereGeometry(0.2, 16, 16);
+    // Sphere (Player)
+    const sphereGeometry = new THREE.SphereGeometry(0.5, 16, 16);
     const sphereMaterial = new THREE.MeshLambertMaterial({ color: 0x7777ff });
     sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
     sphere.position.set(0, 1, 0);
@@ -63,23 +65,11 @@ function init() {
     const boxGeometry = new THREE.BoxGeometry();
     const boxMaterial = new THREE.MeshLambertMaterial({ color: Math.random() * 0xffffff });
     const box = new THREE.Mesh(boxGeometry, boxMaterial);
-    box.position.x = -1;
+    box.position.x = -5;
     box.position.y = 1.5;
     box.position.z = -1;
     scene.add(box);
     objects.push(box);
-
-    // Add PointerLockControls
-    controls = new PointerLockControls(camera, document.body);
-    document.addEventListener('click', () => controls.lock(), false);
-
-    controls.addEventListener('lock', () => {
-        console.log('Pointer locked');
-    });
-
-    controls.addEventListener('unlock', () => {
-        console.log('Pointer unlocked');
-    });
 
     // Keyboard controls
     document.addEventListener('keydown', onKeyDown, false);
@@ -94,6 +84,61 @@ function init() {
             submitText();
         }
     });
+
+    // Initialize sky
+    initSky();
+}
+
+function initSky() {
+    // Add Sky
+    const sky = new Sky();
+    sky.scale.setScalar(1000000);
+    scene.add(sky);
+
+    const sun = new THREE.Vector3();
+
+    const effectController = {
+        turbidity: 10,
+        rayleigh: 3,
+        mieCoefficient: 0.005,
+        mieDirectionalG: 0.7,
+        elevation: 2,
+        azimuth: 180,
+        exposure: renderer.toneMappingExposure
+    };
+
+    function updateSky() {
+        const uniforms = sky.material.uniforms;
+        uniforms['turbidity'].value = effectController.turbidity;
+        uniforms['rayleigh'].value = effectController.rayleigh;
+        uniforms['mieCoefficient'].value = effectController.mieCoefficient;
+        uniforms['mieDirectionalG'].value = effectController.mieDirectionalG;
+
+        const phi = THREE.MathUtils.degToRad(90 - effectController.elevation);
+        const theta = THREE.MathUtils.degToRad(effectController.azimuth);
+
+        sun.setFromSphericalCoords(1, phi, theta);
+
+        uniforms['sunPosition'].value.copy(sun);
+
+        renderer.toneMappingExposure = effectController.exposure;
+        renderer.render(scene, camera);
+
+        // Align sphere to face the sun
+        const directionToSun = new THREE.Vector3();
+        directionToSun.subVectors(sun, sphere.position).normalize();
+        
+        // Calculate the angle to rotate the sphere to face the sun
+        const angle = Math.atan2(directionToSun.x, directionToSun.z);
+        sphere.rotation.y = angle;
+
+        // Update camera position relative to sphere (for third-person view)
+        const offset = new THREE.Vector3(0, 1, -5).applyQuaternion(sphere.quaternion);
+        camera.position.copy(sphere.position).add(offset);
+        camera.lookAt(sphere.position.x, sphere.position.y + 1.6, sphere.position.z);
+    }
+
+    updateSky();
 }
 
 function onKeyDown(event) {
@@ -106,7 +151,7 @@ function onKeyDown(event) {
             break;
         case 'ArrowRight':
         case 'KeyD':
-            moveLeft = true;
+            moveRight = true;
             break;
         case 'ArrowDown':
         case 'KeyS':
@@ -114,7 +159,7 @@ function onKeyDown(event) {
             break;
         case 'ArrowLeft':
         case 'KeyA':
-            moveRight = true;
+            moveLeft = true;
             break;
     }
 }
@@ -127,7 +172,7 @@ function onKeyUp(event) {
             break;
         case 'ArrowRight':
         case 'KeyD':
-            moveLeft = false;
+            moveRight = false;
             break;
         case 'ArrowDown':
         case 'KeyS':
@@ -135,7 +180,7 @@ function onKeyUp(event) {
             break;
         case 'ArrowLeft':
         case 'KeyA':
-            moveRight = false;
+            moveLeft = false;
             break;
     }
 }
@@ -205,45 +250,61 @@ function startGame() {
     const startScreen = document.getElementById('startScreen');
     startScreen.style.display = 'none';
 
-    // Lock pointer and start the game
-    controls.lock();
+    // Remove the event listener to prevent it from firing multiple times
+    document.removeEventListener('click', startGame);
+
     animate();
 }
 
 function animate() {
     requestAnimationFrame(animate);
 
-    if (controls.isLocked === true) {
-        const delta = 0.1; // Adjust the speed as needed
-        velocity.x -= velocity.x * 10.0 * delta;
-        velocity.z -= velocity.z * 10.0 * delta;
+    // Calculate the forward and right vectors based on the sphere's rotation
+    const forward = new THREE.Vector3(Math.sin(sphere.rotation.y), 0, Math.cos(sphere.rotation.y));
+    const right = new THREE.Vector3(Math.cos(sphere.rotation.y), 0, -Math.sin(sphere.rotation.y));
 
-        direction.z = Number(moveForward) - Number(moveBackward);
-        direction.x = Number(moveRight) - Number(moveLeft);
-        direction.normalize();
+    // Calculate the movement direction
+    direction.set(0, 0, 0);
+    if (moveForward) direction.add(forward);
+    if (moveBackward) direction.sub(forward);
+    if (moveLeft) direction.sub(right);
+    if (moveRight) direction.add(right);
 
-        if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta;
-        if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
+    // Normalize direction vector and apply movement speed
+    direction.normalize().multiplyScalar(movementSpeed);
 
-        const moveX = velocity.x * delta;
-        const moveZ = velocity.z * delta;
+    // Calculate the new position
+    const newX = sphere.position.x + direction.x;
+    const newZ = sphere.position.z + direction.z;
 
-        // Move the sphere (camera)
-        sphere.position.x += moveX;
-        sphere.position.z += moveZ;
-
-        // Keep the sphere within terrain boundaries
-        sphere.position.x = Math.max(-12.5, Math.min(12.5, sphere.position.x));
-        sphere.position.z = Math.max(-12.5, Math.min(12.5, sphere.position.z));
-        sphere.position.y = 1;
-
-        // Update camera position relative to sphere (for first-person view)
-        camera.position.set(sphere.position.x, sphere.position.y + 0.8, sphere.position.z + 2);
-        camera.lookAt(sphere.position.x, sphere.position.y + 1, sphere.position.z);
-
-        // Check for collisions
-        checkCollision();
+    // Check boundaries and update position
+    if (newX >= -terrainHalfSize && newX <= terrainHalfSize) {
+        sphere.position.x = newX;
     }
+
+    if (newZ >= -terrainHalfSize && newZ <= terrainHalfSize) {
+        sphere.position.z = newZ;
+    }
+
+    // Rotate the sphere for turning
+    if (moveLeft) {
+        sphere.rotation.y += rotationSpeed;
+    }
+    if (moveRight) {
+        sphere.rotation.y -= rotationSpeed;
+    }
+
+    // Update sphere position based on terrain height
+    const terrainHeight = getTerrainHeightAt(sphere.position.x, sphere.position.z);
+    sphere.position.y = terrainHeight + 1; // Adjust to be slightly above the terrain
+
+    // Update camera position relative to sphere (for first-person view)
+    const offset = new THREE.Vector3(0, 1, -5).applyAxisAngle(new THREE.Vector3(0, 1, 0), sphere.rotation.y);
+    camera.position.copy(sphere.position).add(offset);
+    camera.lookAt(sphere.position.x, sphere.position.y + 1.6, sphere.position.z);
+
+    // Check for collisions
+    checkCollision();
 
     // Rotate the cubes
     objects.forEach(obj => {

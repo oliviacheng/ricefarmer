@@ -25,12 +25,17 @@ export function createTerrain(scene) {
         vertices[i + 1] = y;
     }
 
+    // Add warm ambient lighting from below the terrain
+    const warmAmbientLight = new THREE.AmbientLight(0xffaa66, 2); // Warm light
+    warmAmbientLight.position.set(0, -50, 0); // Position below the terrain
+    scene.add(warmAmbientLight);
+
     // Apply colors based on height
     const colors = [];
     for (let i = 0; i < vertices.length; i += 3) {
         const y = vertices[i + 1];
         if (y >= 0.4 && y <= 1) {
-            colors.push(0.909, 0.921, 0.933); // #E8EBEE
+            colors.push(0.569, 0.502, 0.502); // #E8EBEE
         } else if (y >= 0 && y <= 0.3) {
             colors.push(0.678, 0.725, 0.761); // #ADB9C2
         } else {
@@ -43,7 +48,7 @@ export function createTerrain(scene) {
     const material = new THREE.MeshLambertMaterial({ 
         vertexColors: true,
         transparent: true, // Enable transparency
-        opacity: 0.1 // Set default opacity (can be adjusted)
+        opacity: 0.2 // Set default opacity (can be adjusted)
      });
     terrainMesh = new THREE.Mesh(geometry, material);
     
