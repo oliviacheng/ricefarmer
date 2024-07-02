@@ -1,7 +1,5 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js';
 import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/controls/PointerLockControls.js';
-import { Sky } from 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/objects/Sky.js';
-import { createTerrain, getTerrainHeightAt } from './terrain.js';
 
 let scene, camera, renderer, sphere, controls;
 let moveForward = false;
@@ -14,7 +12,6 @@ const speed = 5.0;
 const objects = [];
 let isColliding = false;
 let collidingObject = null;
-const terrainHalfSize = 100; // Half of the terrain size
 
 init();
 animate();
@@ -22,12 +19,12 @@ animate();
 function init() {
     console.log('Initializing scene');
 
-    // Set up document click event to start game
-    document.addEventListener('click', startGame);
+    // Set up start screen click event
+    const startScreen = document.getElementById('startScreen');
+    startScreen.addEventListener('click', startGame);
 
     // Scene
     scene = new THREE.Scene();
-    console.log('Scene initialized:', scene);
 
     // Camera
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -38,13 +35,14 @@ function init() {
     renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setClearColor(0xffffff); // Set background color to white
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.5;
     document.body.appendChild(renderer.domElement);
 
-    // Initialize and create terrain
-    console.log('Creating terrain');
-    createTerrain(scene);
+    // Terrain
+    const terrainGeometry = new THREE.PlaneGeometry(25, 25, 25, 25);
+    const terrainMaterial = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+    const terrain = new THREE.Mesh(terrainGeometry, terrainMaterial);
+    terrain.rotation.x = -Math.PI / 2;
+    scene.add(terrain);
 
     // Sphere (Camera)
     const sphereGeometry = new THREE.SphereGeometry(0.2, 16, 16);
@@ -73,7 +71,7 @@ function init() {
 
     // Add PointerLockControls
     controls = new PointerLockControls(camera, document.body);
-    console.log('PointerLockControls initialized:', controls);
+    document.addEventListener('click', () => controls.lock(), false);
 
     controls.addEventListener('lock', () => {
         console.log('Pointer locked');
@@ -96,48 +94,6 @@ function init() {
             submitText();
         }
     });
-
-    // Initialize sky
-    initSky();
-}
-
-function initSky() {
-    // Add Sky
-    const sky = new Sky();
-    sky.scale.setScalar(450000);
-    scene.add(sky);
-
-    const sun = new THREE.Vector3();
-
-    const effectController = {
-        turbidity: 10,
-        rayleigh: 3,
-        mieCoefficient: 0.005,
-        mieDirectionalG: 0.7,
-        elevation: 2,
-        azimuth: 180,
-        exposure: renderer.toneMappingExposure
-    };
-
-    function updateSky() {
-        const uniforms = sky.material.uniforms;
-        uniforms['turbidity'].value = effectController.turbidity;
-        uniforms['rayleigh'].value = effectController.rayleigh;
-        uniforms['mieCoefficient'].value = effectController.mieCoefficient;
-        uniforms['mieDirectionalG'].value = effectController.mieDirectionalG;
-
-        const phi = THREE.MathUtils.degToRad(90 - effectController.elevation);
-        const theta = THREE.MathUtils.degToRad(effectController.azimuth);
-
-        sun.setFromSphericalCoords(1, phi, theta);
-
-        uniforms['sunPosition'].value.copy(sun);
-
-        renderer.toneMappingExposure = effectController.exposure;
-        renderer.render(scene, camera);
-    }
-
-    updateSky();
 }
 
 function onKeyDown(event) {
@@ -249,30 +205,22 @@ function startGame() {
     const startScreen = document.getElementById('startScreen');
     startScreen.style.display = 'none';
 
-    // Remove the event listener to prevent it from firing multiple times
-    document.removeEventListener('click', startGame);
-
-    // Ensure controls is defined before calling lock
-    if (controls) {
-        controls.lock();
-    } else {
-        console.error('PointerLockControls not initialized.');
-    }
-
+    // Lock pointer and start the game
+    controls.lock();
     animate();
 }
 
 function animate() {
     requestAnimationFrame(animate);
 
-    if (controls && controls.isLocked === true) {
+    if (controls.isLocked === true) {
         const delta = 0.1; // Adjust the speed as needed
         velocity.x -= velocity.x * 10.0 * delta;
         velocity.z -= velocity.z * 10.0 * delta;
 
         direction.z = Number(moveForward) - Number(moveBackward);
         direction.x = Number(moveRight) - Number(moveLeft);
-        direction.normalize(); 
+        direction.normalize();
 
         if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta;
         if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta;
@@ -284,15 +232,10 @@ function animate() {
         sphere.position.x += moveX;
         sphere.position.z += moveZ;
 
-        // Constrain the sphere within the terrain boundaries
-        sphere.position.x = Math.max(-terrainHalfSize, Math.min(terrainHalfSize, sphere.position.x));
-        sphere.position.z = Math.max(-terrainHalfSize, Math.min(terrainHalfSize, sphere.position.z));
-
-        // Update sphere position based on terrain height
-        const terrainHeight = getTerrainHeightAt(sphere.position.x, sphere.position.z);
-        console.log(`Sphere position before: (${sphere.position.x}, ${sphere.position.y}, ${sphere.position.z})`);
-        sphere.position.y = terrainHeight + 1; // Adjust to be slightly above the terrain
-        console.log(`Sphere position after: (${sphere.position.x}, ${sphere.position.y}, ${sphere.position.z})`);
+        // Keep the sphere within terrain boundaries
+        sphere.position.x = Math.max(-12.5, Math.min(12.5, sphere.position.x));
+        sphere.position.z = Math.max(-12.5, Math.min(12.5, sphere.position.z));
+        sphere.position.y = 1;
 
         // Update camera position relative to sphere (for first-person view)
         camera.position.set(sphere.position.x, sphere.position.y + 0.8, sphere.position.z + 2);
@@ -310,4 +253,3 @@ function animate() {
 
     renderer.render(scene, camera);
 }
-
