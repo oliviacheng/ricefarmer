@@ -6,6 +6,9 @@
     <title>My first three.js app</title>
     <style>
         body { margin: 0; }
+        #textInputBox { display: none; } /* Initially hidden */
+        .breathingText { position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; font-weight: bold; text-align: center; color: #333; }
+        .countdownText { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 48px; font-weight: bold; text-align: center; color: #333; }
     </style>
     <script type="importmap">
         {
@@ -21,15 +24,22 @@
   <!-- Start Screen -->
   <div id="startScreen">Click to start healing</div>
 
-    <!--inputbox-->
-    <div id="textInputBox">
-        <input type="text" id="textInput" placeholder="Something I need to let go of...">
-        <button onclick="submitText()">Submit</button>
-    </div>
+  <!-- Input Box -->
+  <div id="textInputBox">
+      <input type="text" id="textInput" placeholder="Something I need to let go of..." autocomplete="off">
+      <button onclick="submitText()">Submit</button>
+  </div>
 
-    <!--cdn-->
-    <script type="module" src="./main.js"></script>
-    <script type="module" src="https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js"></script>
-    <script type="module" src="https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/controls/PointerLockControls.js"></script>
+  <!-- Breathing Exercise Texts -->
+  <div id="breathingText" class="breathingText" style="display: none;">Let's take a deep breathe in...</div>
+  <div id="breatheoutText" class="breatheoutText" style="display: none;">...and breathe out to blow these thoughts away</div>
+  <div id="countdownText" class="countdownText" style="display: none;"></div>
+
+  <!-- Main JavaScript -->
+  <script type="module" src="./main.js"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/controls/PointerLockControls.js"></script>
+  <script type="module" src="https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/loaders/GLTFLoader.js"></script>
+
 </body>
 </html>
