@@ -61,7 +61,7 @@ function init() {
 
     // Load player model
     const loader = new GLTFLoader();
-    loader.load('public/poly3d.net - Idle.glb', function(gltf) {
+    loader.load('public/poly3d.net-Idle.glb', function(gltf) {
         player = gltf.scene;
         player.position.set(0, -5, 0);
         scene.add(player);
@@ -72,7 +72,7 @@ function init() {
 
         console.log('Idle animation loaded and playing.');
 
-        loader.load('public/poly3d.net - Run Forward.glb', function(gltf) {
+        loader.load('public/poly3d.net-RunForward.glb', function(gltf) {
             walkAction = mixer.clipAction(gltf.animations[0]);
             walkAction.enabled = false;
             console.log('Walk animation loaded.');
