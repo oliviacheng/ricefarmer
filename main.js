@@ -1,7 +1,8 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/loaders/GLTFLoader.js';
 import { Sky } from 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/objects/Sky.js';
-import { createTerrain, getTerrainHeightAt } from './terrain.js';
+import { createTerrain, getTerrainHeightAt, getGrassBunches, removeGrassBunch } from './terrain.js';
+import { createRicegrassUI, updateRicegrassCount } from './gui.js';
 
 let scene, camera, renderer, player, idleAction, walkAction, mixer, clock;
 let moveForward = false;
@@ -11,17 +12,11 @@ let moveRight = false;
 const rotationSpeed = 0.02;
 const movementSpeed = 0.08;
 let direction = new THREE.Vector3();
-const objects = [];
-let isColliding = false;
-let collidingObject = null;
 const terrainHalfSize = 100; // Half of the terrain size
-let breathingInterval;
 let canMove = true;
 let sun = new THREE.Vector3();
-
-const breathingTextElement = document.getElementById('breathingText');
-const countdownTextElement = document.getElementById('countdownText');
-const breatheoutTextElement = document.getElementById('breatheoutText');
+let highlightedBunch = null;
+let ricegrass = 0;
 
 init();
 animate();
@@ -61,7 +56,7 @@ function init() {
 
     // Load player model
     const loader = new GLTFLoader();
-    loader.load('public/poly3d.net-Idle.glb', function(gltf) {
+    loader.load('public/ricefarmer-animateidle.glb', function(gltf) {
         player = gltf.scene;
         player.position.set(0, -5, 0);
         scene.add(player);
@@ -72,7 +67,7 @@ function init() {
 
         console.log('Idle animation loaded and playing.');
 
-        loader.load('public/poly3d.net-RunForward.glb', function(gltf) {
+        loader.load('public/ricefarmer-animateidle.glb', function(gltf) {
             walkAction = mixer.clipAction(gltf.animations[0]);
             walkAction.enabled = false;
             console.log('Walk animation loaded.');
@@ -86,19 +81,10 @@ function init() {
     const ambientLight = new THREE.AmbientLight(0x404040); // Soft white light
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-    directionalLight.position.set(100, 100, 100);
-    scene.add(directionalLight);
-
-    // Create spinning cube
-    const boxGeometry = new THREE.BoxGeometry();
-    const boxMaterial = new THREE.MeshLambertMaterial({ color: Math.random() * 0xffffff });
-    const box = new THREE.Mesh(boxGeometry, boxMaterial);
-    box.position.x = -5;
-    box.position.y = 1.5;
-    box.position.z = -1;
-    scene.add(box);
-    objects.push(box);
+    // Add Hemisphere Light opposite to the sun with warm diffused colors
+    const hemisphereLight = new THREE.HemisphereLight(0xffe5b4, 0xffad60, 1);
+    hemisphereLight.position.set(-sun.x, -sun.y + 100, 100); // Position opposite to the sun
+    scene.add(hemisphereLight);
 
     // Keyboard controls
     document.addEventListener('keydown', onKeyDown, false);
@@ -107,12 +93,8 @@ function init() {
     // Handle window resize
     window.addEventListener('resize', onWindowResize, false);
 
-    // Event listener for Enter key in the input box
-    document.getElementById('textInput').addEventListener('keydown', function(event) {
-        if (event.key === 'Enter') {
-            submitText();
-        }
-    });
+    // Initialize ricegrass UI
+    createRicegrassUI();
 }
 
 function initSky() {
@@ -123,7 +105,7 @@ function initSky() {
 
     const effectController = {
         turbidity: 10,
-        rayleigh: 3,
+        rayleigh: 4,
         mieCoefficient: 0.005,
         mieDirectionalG: 0.7,
         elevation: 2,
@@ -156,7 +138,7 @@ function alignPlayerToSun() {
     if (player) {
         const directionToSun = new THREE.Vector3();
         directionToSun.subVectors(sun, player.position).normalize();
-        
+
         // Calculate the angle to rotate the player to face the sun
         const angle = Math.atan2(directionToSun.x, directionToSun.z);
         player.rotation.y = angle;
@@ -182,6 +164,21 @@ function onKeyDown(event) {
         case 'ArrowLeft':
         case 'KeyA':
             moveLeft = true;
+            break;
+        case 'Space':
+            if (highlightedBunch) {
+                ricegrass++;
+                console.log('Rice grass collected:', ricegrass);
+                removeGrassBunch(highlightedBunch);
+                highlightedBunch = null;
+
+                // Hide message box
+                const messageBox = document.getElementById('messageBox');
+                messageBox.style.display = 'none';
+
+                // Update ricegrass count UI
+                updateRicegrassCount(ricegrass);
+            }
             break;
     }
     switchAnimation();
@@ -249,110 +246,6 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-function showInputBox() {
-    const inputBox = document.getElementById('textInputBox');
-    inputBox.style.display = 'block';
-    inputBox.querySelector('input').focus(); // Focus on the input box immediately
-}
-
-function hideInputBox() {
-    const inputBox = document.getElementById('textInputBox');
-    inputBox.style.display = 'none';
-}
-
-function displaySubmittedText(text) {
-    const textDisplay = document.createElement('div');
-    textDisplay.innerText = text;
-    textDisplay.className = 'submittedText';
-    document.body.appendChild(textDisplay);
-
-    setTimeout(() => {
-        textDisplay.remove();
-        if (collidingObject) {
-            scene.remove(collidingObject);
-            objects.splice(objects.indexOf(collidingObject), 1); // Remove from objects array
-            collidingObject = null;
-            isColliding = false; 
-            canMove = true; // Allow movement again
-        }
-    }, 10000); // Display for 10 seconds
-}
-
-function submitText() {
-    const inputText = document.getElementById('textInput').value;
-    hideInputBox(); // Hide the input box immediately
-    console.log("Submitted text: " + inputText);
-    displaySubmittedText(inputText);
-    startCountUp();
-}
-
-function inputBoxVisible() {
-    return document.getElementById('textInputBox').style.display === 'block';
-}
-
-function checkCollision() {
-    const playerBox = new THREE.Box3().setFromObject(player);
-    for (let i = 0; i < objects.length; i++) {
-        const objectBox = new THREE.Box3().setFromObject(objects[i]);
-        if (playerBox.intersectsBox(objectBox)) {
-            if (!isColliding && !inputBoxVisible()) {
-                isColliding = true;
-                collidingObject = objects[i];
-                showInputBox();
-                canMove = false; // Disable movement when the input box is shown
-
-                // Stop all movement
-                moveForward = false;
-                moveBackward = false;
-                moveLeft = false;
-                moveRight = false;
-                
-                // Switch to idle animation
-                switchAnimation();
-            }
-            return;
-        }
-    }
-}
-
-function startCountUp() {
-    // Display text elements
-    breathingTextElement.style.display = 'block';
-    countdownTextElement.style.display = 'block';
-    breatheoutTextElement.style.display = 'none';
-
-    let countup = 0;
-    countdownTextElement.innerText = countup;
-
-    breathingInterval = setInterval(() => {
-        countup++;
-        countdownTextElement.innerText = countup;
-        if (countup === 3) { // Adjust the countup limit as needed
-            clearInterval(breathingInterval);
-            breathingTextElement.style.display = 'none';
-            breatheoutTextElement.style.display = 'block';
-            setTimeout(startCountDown, 2000);
-        }
-    }, 1000);
-}
-
-function startCountDown() {
-    let countdown = 3;
-    countdownTextElement.innerText = countdown;
-    countdownTextElement.style.display = 'block';
-
-    breathingInterval = setInterval(() => {
-        countdown--;
-        countdownTextElement.innerText = countdown;
-        if (countdown === 0) {
-            clearInterval(breathingInterval);
-            breatheoutTextElement.style.display = 'none';
-            countdownTextElement.style.display = 'none';
-            canMove = true; // Allow movement after the exercise
-        }
-    }, 1000);
-}
-
 function startGame() {
     // Hide the start screen
     const startScreen = document.getElementById('startScreen');
@@ -366,11 +259,6 @@ function startGame() {
 
 function animate() {
     requestAnimationFrame(animate);
-
-    if (!player) {
-        // Wait until the player is loaded before animating
-        return;
-    }
 
     const delta = clock.getDelta();
 
@@ -416,22 +304,76 @@ function animate() {
 
         // Update player position based on terrain height
         const terrainHeight = getTerrainHeightAt(player.position.x, player.position.z);
-        player.position.y = terrainHeight + 1; // Adjust to be slightly above the terrain
+        player.position.y = terrainHeight + 0.2; // Adjust to be slightly above the terrain
 
         // Update camera position relative to player (for first-person view)
-        const offset = new THREE.Vector3(0, 1, -5).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.rotation.y);
+        const offset = new THREE.Vector3(0, 3, -12).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.rotation.y);
         camera.position.copy(player.position).add(offset);
-        camera.lookAt(player.position.x, player.position.y + 1.6, player.position.z);
+        camera.lookAt(player.position.x, player.position.y + 6, player.position.z);
+
+        // Check for collisions with grass
+        checkGrassCollision();
     }
 
-    // Check for collisions
-    checkCollision();
-
-    // Rotate the cubes
-    objects.forEach(obj => {
-        obj.rotation.x += 0.01;
-        obj.rotation.y += 0.01;
+    // Update grass blades with time uniform
+    scene.traverse((object) => {
+        if (object.isMesh && object.material && object.material.uniforms && object.material.uniforms.time) {
+            object.material.uniforms.time.value += delta;
+        }
     });
 
     renderer.render(scene, camera);
+}
+
+function checkGrassCollision() {
+    const grassBunches = getGrassBunches();
+    let isColliding = false;
+
+    grassBunches.forEach(bunch => {
+        const distance = player.position.distanceTo(bunch.position);
+
+        if (distance < 2) { // Collision threshold
+            if (highlightedBunch !== bunch) {
+                if (highlightedBunch) {
+                    // Remove previous outline
+                    highlightedBunch.traverse(child => {
+                        if (child.isMesh) {
+                            child.material.emissive.set(0x000000);
+                        }
+                    });
+                }
+
+                // Highlight new bunch
+                bunch.traverse(child => {
+                    if (child.isMesh) {
+                        child.material.emissive.set(0x00ff00);
+                    }
+                });
+
+                highlightedBunch = bunch;
+            }
+
+            // Display message box
+            const messageBox = document.getElementById('messageBox');
+            messageBox.style.display = 'block';
+            document.getElementById('harvestText').textContent = 'Harvest?';
+            document.getElementById('instructionText').textContent = "(press 'spacebar' to harvest rice grass)";
+
+            isColliding = true;
+        }
+    });
+
+    if (!isColliding && highlightedBunch) {
+        // Remove outline when no collision
+        highlightedBunch.traverse(child => {
+            if (child.isMesh) {
+                child.material.emissive.set(0x000000);
+            }
+        });
+        highlightedBunch = null;
+
+        // Hide message box
+        const messageBox = document.getElementById('messageBox');
+        messageBox.style.display = 'none';
+    }
 }
