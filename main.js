@@ -18,6 +18,10 @@ let sun = new THREE.Vector3();
 let highlightedBunch = null;
 let ricegrass = 0;
 
+let targetCameraPosition = new THREE.Vector3();
+let smoothFactor = 0.05;
+const spawnPosition = new THREE.Vector3(0, -20, 40);
+
 init();
 animate();
 
@@ -33,7 +37,7 @@ function init() {
 
     // Camera
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.5, 1000);
-    camera.position.set(0, 0, 0);
+    camera.position.set(20, 40, 90);
     scene.add(camera);
 
     // Renderer
@@ -58,7 +62,7 @@ function init() {
     const loader = new GLTFLoader();
     loader.load('public/ricefarmer-animateidle.glb', function(gltf) {
         player = gltf.scene;
-        player.position.set(0, -5, 0);
+        player.position.copy(spawnPosition);
         scene.add(player);
 
         mixer = new THREE.AnimationMixer(player);
@@ -254,7 +258,20 @@ function startGame() {
     // Remove the event listener to prevent it from firing multiple times
     document.removeEventListener('click', startGame);
 
+    // Show the image overlay
+    showOverlayImage();
+
+    // Start the animation loop
     animate();
+}
+
+function showOverlayImage() {
+    const imageOverlay = document.getElementById('imageOverlay');
+    imageOverlay.style.display = 'block';
+
+    setTimeout(() => {
+        imageOverlay.style.display = 'none';
+    }, 5000); // Hide the image after 5 seconds
 }
 
 function animate() {
@@ -275,8 +292,8 @@ function animate() {
         direction.set(0, 0, 0);
         if (moveForward) direction.add(forward);
         if (moveBackward) direction.sub(forward);
-        if (moveLeft) direction.sub(right);
-        if (moveRight) direction.add(right);
+        if (moveLeft) player.rotation.y += rotationSpeed;
+        if (moveRight) player.rotation.y -= rotationSpeed;
 
         // Normalize direction vector and apply movement speed
         direction.normalize().multiplyScalar(movementSpeed);
@@ -294,21 +311,20 @@ function animate() {
             player.position.z = newZ;
         }
 
-        // Rotate the player for turning
-        if (moveLeft) {
-            player.rotation.y += rotationSpeed;
-        }
-        if (moveRight) {
-            player.rotation.y -= rotationSpeed;
-        }
-
         // Update player position based on terrain height
         const terrainHeight = getTerrainHeightAt(player.position.x, player.position.z);
         player.position.y = terrainHeight + 0.2; // Adjust to be slightly above the terrain
 
-        // Update camera position relative to player (for first-person view)
-        const offset = new THREE.Vector3(0, 3, -12).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.rotation.y);
-        camera.position.copy(player.position).add(offset);
+        // Update target camera position relative to player only when moving forward or backward
+        if (moveForward || moveBackward) {
+            const offset = new THREE.Vector3(0, 3, -12).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.rotation.y);
+            targetCameraPosition.copy(player.position).add(offset);
+        }
+
+        // Smoothly interpolate the camera position to the target position
+        camera.position.lerp(targetCameraPosition, smoothFactor);
+
+        // Ensure the camera is always looking at the player
         camera.lookAt(player.position.x, player.position.y + 6, player.position.z);
 
         // Check for collisions with grass
