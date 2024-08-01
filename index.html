@@ -16,10 +16,20 @@
 <body>
 
   <!-- Start Screen -->
-  <div id="startScreen">Click to play</div>
-  <div id="imageOverlay">
-    <img id="overlayImage" src="public/keys.png" alt="Overlay Image" style="width: 200px;">
-</div>
+  <div id="startScreen">
+    <video id="backgroundVideo" autoplay loop muted>
+      <source src="public/coverart.mp4" type="video/mp4">
+    </video>
+    <div id="overlayContent">
+      <h1 id="titleText"> <img src="public/title.svg"></h1>
+      <button id="playButton"> <img src="public/playbutton.svg"></button>
+      <div id="controlButtons">
+        <button id="musicButton"> <img src="public/musicbuttonoff.svg"></button>
+        <button id="soundButton"> <img src="public/soundbuttonoff.svg"></button>
+        <button id="helpButton"> <img src="public/aboutbutton.svg"></button>
+      </div>
+    </div>
+  </div>
 
   <!-- Harvesting -->
   <div id="messageBox">
@@ -28,12 +38,22 @@
   </div>
 
   <!-- GUI Icons -->
-  <div id="ricegrass-container">
+  <div id="ricegrass-container" style="display: none;">
     <div id="ricegrass-icon"></div>
     <div id="ricegrass-text">
         Ricegrass count: <span id="ricegrass-count">0</span>
     </div>
+    <div id="in-game-buttons">
+      <button id="in-game-musicButton"> <img src="public/musicbutton.svg" alt="Music Button"></button>
+      <button id="in-game-soundButton"> <img src="public/soundbutton.svg" alt="Sound Button"></button>
+      <button id="in-game-helpButton"> <img src="public/aboutbutton.svg" alt="Help Button"></button>
+    </div>
   </div>
+
+<!-- Audio Elements -->
+<audio id="natureSounds" src="public/naturesounds.mp3" preload="auto" loop></audio>
+<audio id="backgroundMusic" src="public/ghiblimusic.mp3" preload="auto" loop></audio>
+<audio id="hoverSound" src="public/buttonhoversound.mp3" preload="auto"></audio>
 
   <!-- Main JavaScript -->
   <script type="module" src="./main.js"></script>

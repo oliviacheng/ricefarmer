@@ -22,14 +22,84 @@ let targetCameraPosition = new THREE.Vector3();
 let smoothFactor = 0.05;
 const spawnPosition = new THREE.Vector3(0, -20, 40);
 
-init();
-animate();
+document.addEventListener('DOMContentLoaded', () => {
+    let audioStarted = false;
+
+    function startAudio() {
+        if (!audioStarted) {
+            const natureSounds = document.getElementById('natureSounds');
+            const backgroundMusic = document.getElementById('backgroundMusic');
+
+            // Start both audio elements muted
+            natureSounds.muted = true;
+            backgroundMusic.muted = true;
+
+            // Set initial volume
+            natureSounds.volume = 0.5; // Set to 50%
+            backgroundMusic.volume = 0.3; // Set to 30%
+
+            natureSounds.play().catch(error => {
+                console.log('Nature sounds playback error:', error);
+            });
+
+            backgroundMusic.play().catch(error => {
+                console.log('Background music playback error:', error);
+            });
+
+            audioStarted = true;
+        }
+    }
+
+    window.addEventListener('mousemove', startAudio, { once: true });
+
+    document.getElementById('playButton').addEventListener('click', startGame);
+    document.getElementById('musicButton').addEventListener('click', toggleMusicMute);
+    document.getElementById('soundButton').addEventListener('click', toggleSoundMute);
+
+    const inGameMusicButton = document.getElementById('in-game-musicButton');
+    const inGameSoundButton = document.getElementById('in-game-soundButton');
+    const inGameHelpButton = document.getElementById('in-game-helpButton');
+
+    inGameMusicButton.addEventListener('click', toggleMusicMute);
+    inGameSoundButton.addEventListener('click', toggleSoundMute);
+
+    const buttons = document.querySelectorAll('button');
+    buttons.forEach(button => {
+        button.addEventListener('mouseenter', playHoverSound);
+        button.addEventListener('click', playHoverSound);
+    });
+});
+
+function playHoverSound() {
+    const hoverSound = document.getElementById('hoverSound');
+    hoverSound.currentTime = 0;
+    hoverSound.play();
+}
+
+function toggleMusicMute() {
+    const backgroundMusic = document.getElementById('backgroundMusic');
+    const musicButton = document.getElementById('musicButton');
+    backgroundMusic.muted = !backgroundMusic.muted;
+    if (backgroundMusic.muted) {
+        musicButton.querySelector('img').src = 'public/musicbuttonoff.svg';
+    } else {
+        musicButton.querySelector('img').src = 'public/musicbutton.svg';
+    }
+}
+
+function toggleSoundMute() {
+    const natureSounds = document.getElementById('natureSounds');
+    const soundButton = document.getElementById('soundButton');
+    natureSounds.muted = !natureSounds.muted;
+    if (natureSounds.muted) {
+        soundButton.querySelector('img').src = 'public/soundbuttonoff.svg';
+    } else {
+        soundButton.querySelector('img').src = 'public/soundbutton.svg';
+    }
+}
 
 function init() {
     console.log('Initializing scene');
-
-    // Set up document click event to start game
-    document.addEventListener('click', startGame);
 
     // Scene
     scene = new THREE.Scene();
@@ -60,21 +130,24 @@ function init() {
 
     // Load player model
     const loader = new GLTFLoader();
-    loader.load('public/ricefarmer-animateidle.glb', function(gltf) {
+    loader.load('public/animate-idle.glb', function(gltf) {
         player = gltf.scene;
         player.position.copy(spawnPosition);
         scene.add(player);
 
-        mixer = new THREE.AnimationMixer(player);
-        idleAction = mixer.clipAction(gltf.animations[0]);
-        idleAction.play();
+        if (gltf.animations && gltf.animations.length) {
+            mixer = new THREE.AnimationMixer(player);
+            gltf.animations.forEach((clip) => {
+                mixer.clipAction(clip).play();
+            });
+        }
 
-        console.log('Idle animation loaded and playing.');
+        console.log('Idle animation loaded and playing:', idleAction);
 
-        loader.load('public/ricefarmer-animateidle.glb', function(gltf) {
+        loader.load('public/animate-walk.glb', function(gltf) { // Ensure you're using the correct walk animation file
             walkAction = mixer.clipAction(gltf.animations[0]);
             walkAction.enabled = false;
-            console.log('Walk animation loaded.');
+            console.log('Walk animation loaded:', walkAction);
         });
 
         // Align player to face the sun
@@ -255,23 +328,14 @@ function startGame() {
     const startScreen = document.getElementById('startScreen');
     startScreen.style.display = 'none';
 
-    // Remove the event listener to prevent it from firing multiple times
-    document.removeEventListener('click', startGame);
+    // Show the game GUI
+    document.getElementById('ricegrass-container').style.display = 'block';
 
-    // Show the image overlay
-    showOverlayImage();
+    // Initialize the game
+    init();
 
-    // Start the animation loop
+    // Start the game
     animate();
-}
-
-function showOverlayImage() {
-    const imageOverlay = document.getElementById('imageOverlay');
-    imageOverlay.style.display = 'block';
-
-    setTimeout(() => {
-        imageOverlay.style.display = 'none';
-    }, 5000); // Hide the image after 5 seconds
 }
 
 function animate() {
@@ -283,7 +347,7 @@ function animate() {
         mixer.update(delta);
     }
 
-    if (canMove) {
+    if (canMove && player) { // Ensure player is defined
         // Calculate the forward and right vectors based on the player's rotation
         const forward = new THREE.Vector3(Math.sin(player.rotation.y), 0, Math.cos(player.rotation.y));
         const right = new THREE.Vector3(Math.cos(player.rotation.y), 0, -Math.sin(player.rotation.y));
